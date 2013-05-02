@@ -3,13 +3,17 @@
 Porpoise implements two analytics primitives: counters and events.
 
 
-## Recording events
+## Recording
+
+### Events
 
 The following example records that two users (ids 1 and 2) were active at the
 current time, and user 1 played a song:
 
 ```python
 from porpoise import Analytics
+
+porpoise = Analytics()
 
 porpoise.event('active', 1)
 porpoise.event('active', 2)
@@ -18,13 +22,13 @@ porpoise.event('song:played', 1)
 ```
 
 
-## Recording counters
+### Counters
 
 A couple of examples of incrementing counters:
 
 ```python
-porpoise.count('signups')
-analytics.count('song:played', song.id)
+porpoise.count('signups', 'all')
+porpoise.count('song:played', song.id)
 ```
 
 ## Analysis
@@ -69,3 +73,19 @@ for users in loggedin_and_played(last_24_hours):
 
 
 ### Analysing counters
+
+Each counter key has a number of IDs associated with it. When analysing
+counters, the returned data is a dictionary mapping these IDs to their count.
+
+For example, to print the top 10 songs played in each hour for the last 24 hours:
+
+```python
+counters = porpoise.counters
+
+songs_played = counters('song:played')
+
+for songs in songs_played(last_24_hours):
+  top10 = sorted(songs.iteritems(), lambda s: -s[1])[:5]
+  for song, played in top10:
+    print song, played
+```
