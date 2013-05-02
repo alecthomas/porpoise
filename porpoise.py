@@ -42,7 +42,7 @@ for the last 100 days:
 
     >>> counters = analytics.counters
     >>> signups = counters('signups')
-    >>> daily_signups = signups(dayrange(-100))
+j    >>> daily_signups = signups(dayrange(-100))
 
 """
 
@@ -76,11 +76,11 @@ class Analytics(object):
             tx.setbit(key, id, 1)
         tx.execute()
 
-    def count(self, key, id='count', count=1, time=None, tx=None):
+    def count(self, key, id, count=1, time=None, tx=None):
         """Increment a counter associated with a key (and optionally an ID).
 
         :param key: A symbolic key.
-        :param id: A numeric identifier.
+        :param id: An identifier.
         :param count: The increment.
         :param time: A datetime instance.
         """
@@ -108,10 +108,10 @@ class CounterMetric(object):
             yield self._retrieve(key)
 
     def _retrieve(self, key):
-        print key
         if self.id is None:
             values = self.client.hgetall(key)
-            return values['count'] if 'count' in values else values
+            values = dict((k, int(v)) for k, v in values.iteritems())
+            return values
         else:
             return self.client.hget(key, self.id)
 
@@ -127,20 +127,20 @@ class EventMetric(object):
         for moment in period:
             cleanup = []
             try:
-                key = self._retrieve(moment, cleanup)
+                tx = self.client.pipeline()
+                key = self._retrieve(moment, cleanup, tx)
+                tx.execute()
                 value = self.client.get(key)
-                yield value
+                yield bitset(value)
             finally:
-                for clean in cleanup:
-                    self.client.delete(clean)
+                self.client.delete(*cleanup)
 
-    def _retrieve(self, moment, cleanup, tx=None):
+    def _retrieve(self, moment, cleanup, tx):
         if self.op is None:
             left = 'e.%s.%s' % (self.left, moment)
             return left
         dest = 't.%s' % (uuid.uuid4(),)
         cleanup.append(dest)
-        tx = tx or self.client.pipeline()
         left = self.left._retrieve(moment, cleanup, tx)
         if self.right:
             right = self.right._retrieve(moment, cleanup, tx)
@@ -176,6 +176,19 @@ class EventMetric(object):
         return 'EventMetric(%r)' % self.left
 
 
+def bitset(value):
+    bits = set()
+    if value is None:
+        return bits
+    i = 0
+    for c in value:
+        for j in range(8):
+            if ord(c) & (1 << (7 - j)):
+                bits.add(i)
+            i += 1
+    return bits
+
+
 class moment(object):
     def __init__(self, dt, fmt):
         self.dt = dt
@@ -184,17 +197,20 @@ class moment(object):
     def __str__(self):
         return self.dt.strftime(self.fmt)
 
+    def __repr__(self):
+        return '<moment %s>' % self
+
 
 class _datetimerange(object):
     resolution = None
 
-    def __init__(self, start=-1, end=None):
+    def __init__(self, start=-1, end=0):
         now = datetime.utcnow()
         if isinstance(start, (long, int, float)):
             start = now + self._delta(start)
-        if end is None:
-            end = start + self._delta(1)
-        elif isinstance(end, (long, int, float)):
+            if end is None:
+                end = start + self._delta(1)
+        if isinstance(end, (long, int, float)):
             end = now + self._delta(end)
         self.start = start
         self.end = end
