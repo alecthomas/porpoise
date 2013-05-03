@@ -18,7 +18,7 @@ class PyTest(TestCommand):
 
 setup(
     name='Porpoise',
-    version='0.1.0',
+    version='0.1.1',
     url='https://github.com/alecthomas/porpoise',
     license='BSD',
     author='Alec Thomas',

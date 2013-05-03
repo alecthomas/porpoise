@@ -133,7 +133,8 @@ class EventMetric(object):
                 value = self.client.get(key)
                 yield bitset(value)
             finally:
-                self.client.delete(*cleanup)
+                if cleanup:
+                    self.client.delete(*cleanup)
 
     def _retrieve(self, moment, cleanup, tx):
         if self.op is None:
